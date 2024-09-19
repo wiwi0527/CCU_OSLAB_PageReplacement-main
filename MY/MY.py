@@ -360,12 +360,14 @@ class MyCache:
         self.layer2 = RBTree()                    # 第2層：
         self.trash  = []                          # 垃圾桶：記錄被丟棄的頁面再度被使用的誤差
         self.deviations = []  #存所有的誤差值
+        self.reuse_distance = [] 
 
 
     def access(self, frame_number):
         #####print(f"Accessing Frame:{hex(frame_number)}", end=f', Time:{cur_time}\n')
         global HitCount
         global MissCount
+        global averge_reuse_distance
 
         found_layer, found_frame = self.search(frame_number)
         #found_frame.ref_count += 1
@@ -411,8 +413,11 @@ class MyCache:
             MissCount += 1
             dev = found_frame.next_access_time - cur_time
             self.deviations.append(dev)
-            self.trash.remove(found_frame)
 
+            index_temp = self.trash.index(found_frame) 
+            self.reuse_distance.insert(0, index_temp) ## 加入新的想法
+            
+            self.trash.remove(found_frame)
             found_frame.last_access_time = cur_time
             self.layer0.insert(0, found_frame)
         else:
@@ -438,7 +443,8 @@ class MyCache:
         # 丟到trash去（為了評估誤差）
         while self.layer2.node_cnt > 204800:
             NotNeeded_node = self.layer2.max()
-            self.trash.append(NotNeeded_node.frame)
+            self.trash.insert(0,NotNeeded_node)
+            # self.trash.append(NotNeeded_node.frame)
             self.layer2.rmv(NotNeeded_node.frame)
         
         return
@@ -486,6 +492,8 @@ class MyCache:
 HitCount  = 0
 MissCount = 0
 cur_time  = 0
+averge_reuse_distance = 0 
+
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         # 有指定要模擬的log檔參數
@@ -525,6 +533,10 @@ print(f"MissCount: {MissCount}")
 print(f"HitRation: {(HitCount * 100) / (HitCount + MissCount)} %")
 print(f"L0_cnt:{len(cache.layer0)}, L1_cnt:{cache.layer1.frame_cnt}, L2_cnt:{cache.layer2.node_cnt}")
 print(f"LenDevs: {len(cache.deviations)}")
+
+averge_reuse_distance = sum(cache.reuse_distance) / len(cache.reuse_distance)
+
+print(f"平均reuse distance:{averge_reuse_distance}")
 
 
 with open(output_path, 'wb') as output_file:
